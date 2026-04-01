@@ -1,10 +1,8 @@
 import { IncomingMessage, ServerResponse } from 'http'
-import { parseRequest } from './_lib/parser'
-import { getScreenshot } from './_lib/chromium'
-import { getHtml } from './_lib/template'
+import { parseRequest } from './_lib/parser.js'
+import { renderCardImage, getImageContentType } from './_lib/template.js'
 
-const isDev = process.env.VERCEL_REGION === 'dev1'
-const isHtmlDebug = process.env.OG_HTML_DEBUG === '1'
+const isDebug = process.env.OG_HTML_DEBUG === '1'
 
 export default async function handler(
   req: IncomingMessage,
@@ -12,25 +10,27 @@ export default async function handler(
 ) {
   try {
     const parsedReq = parseRequest(req)
-    const html = getHtml(parsedReq)
-    if (isHtmlDebug) {
-      res.setHeader('Content-Type', 'text/html')
-      res.end(html)
+
+    if (isDebug) {
+      res.statusCode = 200
+      res.setHeader('Content-Type', 'application/json; charset=utf-8')
+      res.end(JSON.stringify(parsedReq, null, 2))
       return
     }
-    const { fileType } = parsedReq
-    const file = await getScreenshot(html, fileType, isDev)
+
+    const file = await renderCardImage(parsedReq)
+
     res.statusCode = 200
-    res.setHeader('Content-Type', `image/${fileType}`)
+    res.setHeader('Content-Type', getImageContentType(parsedReq.fileType))
     res.setHeader(
       'Cache-Control',
-      `public, immutable, no-transform, s-maxage=31536000, max-age=31536000`
+      'public, immutable, no-transform, s-maxage=31536000, max-age=31536000'
     )
     res.end(file)
-  } catch (e) {
+  } catch (error) {
     res.statusCode = 500
     res.setHeader('Content-Type', 'text/html')
     res.end('<h1>Internal Error</h1><p>Sorry, there was a problem</p>')
-    console.error(e)
+    console.error(error)
   }
 }

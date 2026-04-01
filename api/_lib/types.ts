@@ -10,4 +10,6 @@ export interface ParsedRequest {
   fontSize: string
   brand: string
   images: string[]
+  widths: string[]
+  heights: string[]
 }

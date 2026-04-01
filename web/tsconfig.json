@@ -2,6 +2,8 @@
   "extends": "../api/tsconfig.json",
   "compilerOptions": {
     "module": "esnext",
+    "moduleResolution": "bundler",
+    "rootDir": "..",
     "outDir": "../public/dist"
   },
   "include": ["./"]

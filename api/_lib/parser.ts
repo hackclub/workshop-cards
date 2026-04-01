@@ -1,17 +1,30 @@
 import { IncomingMessage } from 'http'
-import { parse } from 'url'
-import { ParsedRequest } from './types'
+import { ParsedRequest } from './types.js'
 
 export function parseRequest(req: IncomingMessage) {
   console.log('HTTP ' + req.url)
-  const { pathname, query } = parse(req.url || '/', true)
-  const { fontSize, images, theme, md, brand, caption } = query || {}
+  const requestUrl = new URL(req.url || '/', 'http://localhost')
+  const { pathname } = requestUrl
+  const fontSize = requestUrl.searchParams.get('fontSize')
+  const images = requestUrl.searchParams.getAll('images')
+  const widths = requestUrl.searchParams.getAll('widths')
+  const heights = requestUrl.searchParams.getAll('heights')
+  const theme = requestUrl.searchParams.get('theme')
+  const md = requestUrl.searchParams.get('md')
+  const brand = requestUrl.searchParams.get('brand')
+  const caption = requestUrl.searchParams.get('caption')
 
-  if (Array.isArray(fontSize)) {
+  if (requestUrl.searchParams.getAll('fontSize').length > 1) {
     throw new Error('Expected a single fontSize')
   }
-  if (Array.isArray(theme)) {
+  if (requestUrl.searchParams.getAll('theme').length > 1) {
     throw new Error('Expected a single theme')
+  }
+  if (requestUrl.searchParams.getAll('brand').length > 1) {
+    throw new Error('Expected a single brand')
+  }
+  if (requestUrl.searchParams.getAll('caption').length > 1) {
+    throw new Error('Expected a single caption')
   }
 
   const arr = (pathname || '/').slice(1).split('.')
@@ -28,22 +41,30 @@ export function parseRequest(req: IncomingMessage) {
 
   const parsedRequest: ParsedRequest = {
     fileType: extension === 'jpeg' ? extension : 'png',
-    text: decodeURIComponent(text),
+    text: safeDecode(text),
     theme: theme === 'dark' ? 'dark' : 'light',
     md: md === '1' || md === 'true',
     fontSize: fontSize || '250px',
-    brand: String(brand),
-    caption: decodeURIComponent(caption as string),
-    images: getArray(images)
+    brand: brand || '',
+    caption: caption ? safeDecode(caption) : '',
+    images: getArray(images),
+    widths: getArray(widths),
+    heights: getArray(heights)
   }
-  parsedRequest.images = getDefaultImages(parsedRequest.images)
   return parsedRequest
 }
 
-function getArray(stringOrArray: string[] | string): string[] {
+function getArray(stringOrArray: string[] | string | undefined): string[] {
+  if (typeof stringOrArray === 'undefined') {
+    return []
+  }
   return Array.isArray(stringOrArray) ? stringOrArray : [stringOrArray]
 }
 
-function getDefaultImages(images: string[]) {
-  return images.length > 0 && images[0] ? images : []
+function safeDecode(value: string) {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
 }

@@ -3,3 +3,5 @@
 node_modules
 public/dist
 api/dist
+.env
+.env.local

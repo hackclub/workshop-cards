@@ -1,6 +1,5 @@
 {
   "public": true,
-  "functions": { "api/**": {} },
   "rewrites": [{ "source": "/(.+)", "destination": "/api" }],
   "github": { "silent": true }
 }

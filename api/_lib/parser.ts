@@ -4,7 +4,7 @@ const MAX_TEXT_LENGTH = 200
 const MAX_IMAGES = 10
 
 export function parseRequest(req: Request) {
-  const requestUrl = new URL(req.url)
+  const requestUrl = new URL(req.url, 'http://localhost')
   console.log('HTTP ' + requestUrl.pathname)
   const { pathname } = requestUrl
   const fontSize = requestUrl.searchParams.get('fontSize')

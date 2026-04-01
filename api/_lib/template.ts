@@ -9,8 +9,8 @@ const CANVAS_WIDTH = 2048
 const CANVAS_HEIGHT = 1170
 
 const FONT_REGULAR_URL =
-  'https://assets.hackclub.com/fonts/Phantom_Sans_0.7/Regular.woff'
-const FONT_BOLD_URL = 'https://assets.hackclub.com/fonts/Phantom_Sans_0.7/Bold.woff'
+  'https://assets.hackclub.com/fonts/Phantom_Sans_0.8/Regular.woff'
+const FONT_BOLD_URL = 'https://assets.hackclub.com/fonts/Phantom_Sans_0.8/Bold.woff'
 const LOGO_URL = 'https://assets.hackclub.com/icon-rounded.svg'
 
 const fontCache = Promise.all([

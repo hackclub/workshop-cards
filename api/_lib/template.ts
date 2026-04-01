@@ -65,14 +65,14 @@ const themeColors: Record<
   }
 }
 
-export async function renderCardImage(parsedReq: ParsedRequest) {
+export async function renderCardImage(parsedReq: ParsedRequest): Promise<Uint8Array> {
   const imageResponse = new ImageResponse(buildCard(parsedReq), {
     width: CANVAS_WIDTH,
     height: CANVAS_HEIGHT,
     fonts: await fontCache
   })
 
-  const buffer = Buffer.from(await imageResponse.arrayBuffer())
+  const buffer = new Uint8Array(await imageResponse.arrayBuffer())
   if (parsedReq.fileType === 'jpeg') {
     return sharp(buffer).jpeg({ quality: 92 }).toBuffer()
   }

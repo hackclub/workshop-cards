@@ -1,130 +1,19 @@
-import { ParsedRequest, Theme, FileType } from '../api/_lib/types'
-const { H, R, copee } = window as any
-let timeout = -1
-
-interface ImagePreviewProps {
-  src: string
-  onclick: () => void
-  onload: () => void
-  onerror: () => void
-  loading: boolean
-}
-
-const ImagePreview = ({
-  src,
-  onclick,
-  onload,
-  onerror,
-  loading
-}: ImagePreviewProps) => {
-  const style = {
-    filter: loading ? 'blur(5px)' : '',
-    opacity: loading ? 0.1 : 1
-  }
-  const title = 'Click to copy image URL to clipboard'
-  return H(
-    'a',
-    { className: 'image-wrapper', href: src, onclick },
-    H('img', { src, onload, onerror, style, title })
-  )
-}
-
 interface DropdownOption {
   text: string
   value: string
 }
 
-interface DropdownProps {
-  options: DropdownOption[]
-  value: string
-  onchange: (val: string) => void
-  small: boolean
-}
-
-const Dropdown = ({ options, value, onchange, small }: DropdownProps) => {
-  const wrapper = small ? 'select-wrapper small' : 'select-wrapper'
-  const arrow = small ? 'select-arrow small' : 'select-arrow'
-  return H(
-    'div',
-    { className: wrapper },
-    H(
-      'select',
-      { onchange: (e: any) => onchange(e.target.value) },
-      options.map(o =>
-        H('option', { value: o.value, selected: value === o.value }, o.text)
-      )
-    ),
-    H('div', { className: arrow }, '▼')
-  )
-}
-
-interface TextInputProps {
-  value: string
-  oninput: (val: string) => void
-}
-
-const TextInput = ({ value, oninput }: TextInputProps) => {
-  return H(
-    'div',
-    { className: 'input-outer-wrapper' },
-    H(
-      'div',
-      { className: 'input-inner-wrapper' },
-      H('input', {
-        type: 'text',
-        value,
-        oninput: (e: any) => oninput(e.target.value)
-      })
-    )
-  )
-}
-
-interface ButtonProps {
-  label: string
-  onclick: () => void
-}
-
-const Button = ({ label, onclick }: ButtonProps) => {
-  return H('button', { onclick }, label)
-}
-
-interface FieldProps {
-  label: string
-  input: any
-}
-
-const Field = ({ label, input }: FieldProps) => {
-  return H(
-    'div',
-    { className: 'field' },
-    H(
-      'label',
-      H('div', { className: 'field-label' }, label),
-      H('div', { className: 'field-value' }, input)
-    )
-  )
-}
-
-interface ToastProps {
-  show: boolean
-  message: string
-}
-
-const Toast = ({ show, message }: ToastProps) => {
-  const style = { transform: show ? 'translate3d(0,-0px,-0px) scale(1)' : '' }
-  return H(
-    'div',
-    { className: 'toast-area' },
-    H(
-      'div',
-      { className: 'toast-outer', style },
-      H(
-        'div',
-        { className: 'toast-inner' },
-        H('div', { className: 'toast-message' }, message)
-      )
-    )
-  )
+interface AppState {
+  fileType: string
+  fontSize: string
+  theme: string
+  md: boolean
+  text: string
+  caption: string
+  images: string[]
+  loading: boolean
+  showToast: boolean
+  messageToast: string
 }
 
 const themeOptions: DropdownOption[] = [
@@ -147,167 +36,229 @@ const markdownOptions: DropdownOption[] = [
   { text: 'Markdown', value: '1' }
 ]
 
-interface AppState extends ParsedRequest {
-  loading: boolean
-  showToast: boolean
-  messageToast: string
-  overrideUrl: URL | null
+const state: AppState = {
+  fileType: 'png',
+  fontSize: '250px',
+  theme: 'light',
+  md: true,
+  text: 'Personal Website',
+  caption: 'By Hack Club Staff',
+  images: [],
+  loading: true,
+  showToast: false,
+  messageToast: ''
 }
 
-type SetState = (state: Partial<AppState>) => void
+let debounceTimer = -1
 
-const App = (_: any, state: AppState, setState: SetState) => {
-  const setLoadingState = (newState: Partial<AppState>) => {
-    window.clearTimeout(timeout)
-    if (state.overrideUrl && state.overrideUrl !== newState.overrideUrl) {
-      newState.overrideUrl = state.overrideUrl
-    }
-    if (newState.overrideUrl) {
-      timeout = window.setTimeout(() => setState({ overrideUrl: null }), 200)
-    }
-
-    setState({ ...newState, loading: true })
-  }
-  const {
-    fileType = 'png',
-    fontSize = '250px',
-    theme = 'light',
-    md = true,
-    text = 'Personal Website',
-    caption = 'By Hack Club Staff',
-    images = [],
-    showToast = false,
-    messageToast = '',
-    loading = true,
-    overrideUrl = null
-  } = state
-  const mdValue = md ? '1' : '0'
+function getImageUrl(): string {
   const url = new URL(window.location.origin)
-  url.pathname = `${encodeURIComponent(text)}.${fileType}`
-  url.searchParams.append('theme', theme)
-  url.searchParams.append('md', mdValue)
-  url.searchParams.append('fontSize', fontSize)
-  url.searchParams.append('caption', encodeURIComponent(caption))
-  for (let image of images) {
+  url.pathname = `${encodeURIComponent(state.text)}.${state.fileType}`
+  url.searchParams.set('theme', state.theme)
+  url.searchParams.set('md', state.md ? '1' : '0')
+  url.searchParams.set('fontSize', state.fontSize)
+  url.searchParams.set('caption', encodeURIComponent(state.caption))
+  for (const image of state.images) {
     url.searchParams.append('images', image)
   }
+  return url.href
+}
 
-  return H(
+function el<K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  attrs?: Record<string, string>,
+  ...children: (string | Node)[]
+): HTMLElementTagNameMap[K] {
+  const element = document.createElement(tag)
+  if (attrs) {
+    for (const [key, value] of Object.entries(attrs)) {
+      element.setAttribute(key, value)
+    }
+  }
+  for (const child of children) {
+    element.append(typeof child === 'string' ? document.createTextNode(child) : child)
+  }
+  return element
+}
+
+function createDropdown(
+  options: DropdownOption[],
+  value: string,
+  onChange: (val: string) => void
+): HTMLElement {
+  const select = el('select')
+  for (const opt of options) {
+    const option = el('option', { value: opt.value }, opt.text)
+    if (opt.value === value) option.selected = true
+    select.append(option)
+  }
+  select.addEventListener('change', () => onChange(select.value))
+
+  const arrow = el('div', { class: 'select-arrow' }, '▼')
+  return el('div', { class: 'select-wrapper' }, select, arrow)
+}
+
+function createTextInput(value: string, onInput: (val: string) => void): HTMLElement {
+  const input = el('input', { type: 'text', value })
+  input.addEventListener('input', () => onInput(input.value))
+  return el(
     'div',
-    { className: 'split' },
-    H(
-      'div',
-      { className: 'pull-left' },
-      H(
-        'div',
-        H(Field, {
-          label: 'Theme',
-          input: H(Dropdown, {
-            options: themeOptions,
-            value: theme,
-            onchange: (val: Theme) => setLoadingState({ theme: val })
-          })
-        }),
-        H(Field, {
-          label: 'File Type',
-          input: H(Dropdown, {
-            options: fileTypeOptions,
-            value: fileType,
-            onchange: (val: FileType) => setLoadingState({ fileType: val })
-          })
-        }),
-        H(Field, {
-          label: 'Font Size',
-          input: H(Dropdown, {
-            options: fontSizeOptions,
-            value: fontSize,
-            onchange: (val: string) => setLoadingState({ fontSize: val })
-          })
-        }),
-        H(Field, {
-          label: 'Text Type',
-          input: H(Dropdown, {
-            options: markdownOptions,
-            value: mdValue,
-            onchange: (val: string) => setLoadingState({ md: val === '1' })
-          })
-        }),
-        H(Field, {
-          label: 'Text Input',
-          input: H(TextInput, {
-            value: text,
-            oninput: (val: string) => {
-              console.log('oninput ' + val)
-              setLoadingState({ text: val, overrideUrl: url })
-            }
-          })
-        }),
-        H(Field, {
-          label: 'Caption Input',
-          input: H(TextInput, {
-            value: caption,
-            oninput: (val: string) => {
-              console.log('oninput ' + val)
-              setLoadingState({ caption: val, overrideUrl: url })
-            }
-          })
-        }),
-        ...images.map((image, i) =>
-          H(Field, {
-            label: `Image ${i + 1}`,
-            input: H(TextInput, {
-              value: image,
-              oninput: (val: string) => {
-                const clone = [...images]
-                clone[i] = val
-                setLoadingState({ images: clone, overrideUrl: url })
-              }
-            })
-          })
-        ),
-        H(Field, {
-          label: `Image ${images.length + 1}`,
-          input: H(Button, {
-            label: `Add Image ${images.length + 1}`,
-            onclick: () => {
-              setLoadingState({ images: [...images, ''] })
-            }
-          })
-        })
-      )
-    ),
-    H(
-      'div',
-      { className: 'pull-right' },
-      H(ImagePreview, {
-        src: overrideUrl ? overrideUrl.href : url.href,
-        loading: loading,
-        onload: () => setState({ loading: false }),
-        onerror: () => {
-          setState({ showToast: true, messageToast: 'Oops, an error occurred' })
-          setTimeout(() => setState({ showToast: false }), 2000)
-        },
-        onclick: (e: Event) => {
-          e.preventDefault()
-          const success = copee.toClipboard(url.href)
-          if (success) {
-            setState({
-              showToast: true,
-              messageToast: 'Copied image URL to clipboard'
-            })
-            setTimeout(() => setState({ showToast: false }), 3000)
-          } else {
-            window.open(url.href, '_blank')
-          }
-          return false
-        }
-      })
-    ),
-    H(Toast, {
-      message: messageToast,
-      show: showToast
-    })
+    { class: 'input-outer-wrapper' },
+    el('div', { class: 'input-inner-wrapper' }, input)
   )
 }
 
-R(H(App), document.getElementById('app'))
+function createField(label: string, input: HTMLElement): HTMLElement {
+  const labelEl = el('label',
+    undefined,
+    el('div', { class: 'field-label' }, label),
+    el('div', { class: 'field-value' }, input)
+  )
+  return el('div', { class: 'field' }, labelEl)
+}
+
+function showToast(message: string, duration = 3000) {
+  state.showToast = true
+  state.messageToast = message
+  updateToast()
+  setTimeout(() => {
+    state.showToast = false
+    updateToast()
+  }, duration)
+}
+
+let toastEl: HTMLElement | null = null
+
+function updateToast() {
+  if (!toastEl) return
+  const outer = toastEl.querySelector('.toast-outer') as HTMLElement
+  const msg = toastEl.querySelector('.toast-message') as HTMLElement
+  if (outer) {
+    outer.style.transform = state.showToast
+      ? 'translate3d(0, 0, 0) scale(1)'
+      : ''
+  }
+  if (msg) {
+    msg.textContent = state.messageToast
+  }
+}
+
+function createToast(): HTMLElement {
+  toastEl = el(
+    'div',
+    { class: 'toast-area' },
+    el(
+      'div',
+      { class: 'toast-outer' },
+      el(
+        'div',
+        { class: 'toast-inner' },
+        el('div', { class: 'toast-message' }, '')
+      )
+    )
+  )
+  return toastEl
+}
+
+let previewImg: HTMLImageElement | null = null
+
+function updatePreview() {
+  if (!previewImg) return
+  state.loading = true
+  previewImg.style.filter = 'blur(5px)'
+  previewImg.style.opacity = '0.1'
+  const src = getImageUrl()
+  previewImg.src = src
+  const link = previewImg.parentElement as HTMLAnchorElement | null
+  if (link) link.href = src
+}
+
+function debouncedUpdate() {
+  window.clearTimeout(debounceTimer)
+  debounceTimer = window.setTimeout(updatePreview, 200)
+}
+
+function render() {
+  const app = document.getElementById('app')
+  if (!app) return
+  app.innerHTML = ''
+
+  const formFields = el('div')
+
+  formFields.append(
+    createField('Theme', createDropdown(themeOptions, state.theme, val => {
+      state.theme = val
+      updatePreview()
+    })),
+    createField('File Type', createDropdown(fileTypeOptions, state.fileType, val => {
+      state.fileType = val
+      updatePreview()
+    })),
+    createField('Font Size', createDropdown(fontSizeOptions, state.fontSize, val => {
+      state.fontSize = val
+      updatePreview()
+    })),
+    createField('Text Type', createDropdown(markdownOptions, state.md ? '1' : '0', val => {
+      state.md = val === '1'
+      updatePreview()
+    })),
+    createField('Text Input', createTextInput(state.text, val => {
+      state.text = val
+      debouncedUpdate()
+    })),
+    createField('Caption Input', createTextInput(state.caption, val => {
+      state.caption = val
+      debouncedUpdate()
+    }))
+  )
+
+  for (let i = 0; i < state.images.length; i++) {
+    formFields.append(
+      createField(`Image ${i + 1}`, createTextInput(state.images[i], val => {
+        state.images[i] = val
+        debouncedUpdate()
+      }))
+    )
+  }
+
+  const addBtn = el('button', undefined, `Add Image ${state.images.length + 1}`)
+  addBtn.addEventListener('click', () => {
+    state.images.push('')
+    render()
+  })
+  formFields.append(createField(`Image ${state.images.length + 1}`, addBtn))
+
+  const src = getImageUrl()
+  previewImg = el('img', { src, title: 'Click to copy image URL to clipboard' })
+  previewImg.style.filter = 'blur(5px)'
+  previewImg.style.opacity = '0.1'
+  previewImg.addEventListener('load', () => {
+    state.loading = false
+    if (previewImg) {
+      previewImg.style.filter = ''
+      previewImg.style.opacity = '1'
+    }
+  })
+  previewImg.addEventListener('error', () => {
+    showToast('Oops, an error occurred', 2000)
+  })
+
+  const link = el('a', { class: 'image-wrapper', href: src })
+  link.addEventListener('click', e => {
+    e.preventDefault()
+    navigator.clipboard.writeText(getImageUrl()).then(
+      () => showToast('Copied image URL to clipboard'),
+      () => window.open(getImageUrl(), '_blank')
+    )
+  })
+  link.append(previewImg)
+
+  const split = el('div', { class: 'split' },
+    el('div', { class: 'pull-left' }, formFields),
+    el('div', { class: 'pull-right' }, link)
+  )
+
+  app.append(split, createToast())
+}
+
+render()

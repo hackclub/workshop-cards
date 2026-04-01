@@ -1,9 +1,11 @@
-import { IncomingMessage } from 'http'
 import { ParsedRequest } from './types.js'
 
-export function parseRequest(req: IncomingMessage) {
-  console.log('HTTP ' + req.url)
-  const requestUrl = new URL(req.url || '/', 'http://localhost')
+const MAX_TEXT_LENGTH = 200
+const MAX_IMAGES = 10
+
+export function parseRequest(req: Request) {
+  const requestUrl = new URL(req.url)
+  console.log('HTTP ' + requestUrl.pathname)
   const { pathname } = requestUrl
   const fontSize = requestUrl.searchParams.get('fontSize')
   const images = requestUrl.searchParams.getAll('images')
@@ -39,17 +41,22 @@ export function parseRequest(req: IncomingMessage) {
     text = arr.join('.')
   }
 
+  const decodedText = safeDecode(text).slice(0, MAX_TEXT_LENGTH)
+  const decodedCaption = caption
+    ? safeDecode(caption).slice(0, MAX_TEXT_LENGTH)
+    : ''
+
   const parsedRequest: ParsedRequest = {
     fileType: extension === 'jpeg' ? extension : 'png',
-    text: safeDecode(text),
+    text: decodedText,
     theme: theme === 'dark' ? 'dark' : 'light',
     md: md === '1' || md === 'true',
     fontSize: fontSize || '250px',
     brand: brand || '',
-    caption: caption ? safeDecode(caption) : '',
-    images: getArray(images),
-    widths: getArray(widths),
-    heights: getArray(heights)
+    caption: decodedCaption,
+    images: getArray(images).slice(0, MAX_IMAGES),
+    widths: getArray(widths).slice(0, MAX_IMAGES),
+    heights: getArray(heights).slice(0, MAX_IMAGES)
   }
   return parsedRequest
 }

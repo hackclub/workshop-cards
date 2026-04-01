@@ -1,8 +1,6 @@
 {
   "public": true,
-  "functions": {
-    "api/**": { "memory": 3008 }
-  },
+  "functions": { "api/**": {} },
   "rewrites": [{ "source": "/(.+)", "destination": "/api" }],
   "github": { "silent": true }
 }

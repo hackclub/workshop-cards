@@ -5,3 +5,4 @@ public/dist
 api/dist
 .env
 .env.local
+.env*.local

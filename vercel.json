@@ -1,4 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/index.ts": {
+      "maxDuration": 15,
+      "includeFiles": "api/_assets/**"
+    }
+  },
   "rewrites": [{ "source": "/:path((?!dist|style\\.css|favicon\\.ico|robots\\.txt).+)", "destination": "/api" }]
 }

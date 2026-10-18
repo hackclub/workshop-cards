@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { marked } from 'marked'
 import { ImageResponse } from '@vercel/og'
 import sharp from 'sharp'
@@ -8,33 +10,23 @@ import { ParsedRequest, FileType, Theme } from './types.js'
 const CANVAS_WIDTH = 2048
 const CANVAS_HEIGHT = 1170
 
-const FONT_REGULAR_URL =
-  'https://assets.hackclub.com/fonts/Phantom_Sans_0.8/Regular.woff'
-const FONT_BOLD_URL = 'https://assets.hackclub.com/fonts/Phantom_Sans_0.8/Bold.woff'
-const LOGO_URL = 'https://assets.hackclub.com/icon-rounded.svg'
-
-const fontCache = Promise.all([
-  fetch(FONT_REGULAR_URL).then(response => response.arrayBuffer()),
-  fetch(FONT_BOLD_URL).then(response => response.arrayBuffer())
-])
-  .then(([regular, bold]) => [
-    {
-      name: 'Phantom Sans',
-      data: regular,
-      weight: 400 as const,
-      style: 'normal' as const
-    },
-    {
-      name: 'Phantom Sans',
-      data: bold,
-      weight: 700 as const,
-      style: 'normal' as const
-    }
-  ])
-  .catch(error => {
-    console.warn('Failed to load fonts for OG image rendering', error)
-    return []
-  })
+// Included in the function bundle via vercel.json; no network on cold starts.
+const assetPath = (name: string) => join(process.cwd(), 'api', '_assets', name)
+const LOGO_URL = `data:image/svg+xml;base64,${readFileSync(assetPath('icon-rounded.svg')).toString('base64')}`
+const fonts = [
+  {
+    name: 'Phantom Sans',
+    data: readFileSync(assetPath('PhantomSans-Regular.woff')),
+    weight: 400 as const,
+    style: 'normal' as const
+  },
+  {
+    name: 'Phantom Sans',
+    data: readFileSync(assetPath('PhantomSans-Bold.woff')),
+    weight: 700 as const,
+    style: 'normal' as const
+  }
+]
 
 const themeColors: Record<
   Theme,
@@ -69,7 +61,7 @@ export async function renderCardImage(parsedReq: ParsedRequest): Promise<Uint8Ar
   const imageResponse = new ImageResponse(buildCard(parsedReq), {
     width: CANVAS_WIDTH,
     height: CANVAS_HEIGHT,
-    fonts: await fontCache
+    fonts
   })
 
   const buffer = new Uint8Array(await imageResponse.arrayBuffer())
@@ -423,6 +415,9 @@ function getMarkdownStyle(fontSize: number, colors: (typeof themeColors)['light'
 
 function getParagraphStyle(colors: (typeof themeColors)['light']): CSSProperties {
   return {
+    display: 'flex',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
     margin: 0,
     color: colors.foreground
   }

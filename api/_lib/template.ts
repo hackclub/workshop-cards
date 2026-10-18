@@ -9,6 +9,9 @@ import { ParsedRequest, FileType, Theme } from './types.js'
 
 const CANVAS_WIDTH = 2048
 const CANVAS_HEIGHT = 1170
+const IMAGE_TIMEOUT_MS = 3000
+
+type CardImage = { src: string; width: string; height: string }
 
 // Included in the function bundle via vercel.json; no network on cold starts.
 const assetPath = (name: string) => join(process.cwd(), 'api', '_assets', name)
@@ -58,7 +61,8 @@ const themeColors: Record<
 }
 
 export async function renderCardImage(parsedReq: ParsedRequest): Promise<Uint8Array> {
-  const imageResponse = new ImageResponse(buildCard(parsedReq), {
+  const images = await loadImages(parsedReq)
+  const imageResponse = new ImageResponse(buildCard(parsedReq, images), {
     width: CANVAS_WIDTH,
     height: CANVAS_HEIGHT,
     fonts
@@ -72,18 +76,40 @@ export async function renderCardImage(parsedReq: ParsedRequest): Promise<Uint8Ar
   return buffer
 }
 
+async function loadImages(parsedReq: ParsedRequest): Promise<CardImage[]> {
+  const images = await Promise.all(parsedReq.images.map(async (url, index) => {
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS) })
+      if (!response.ok) {
+        await response.body?.cancel()
+        throw new Error(`HTTP ${response.status}`)
+      }
+
+      // Decode before rendering, so error pages and corrupt images cannot reach OG.
+      // PNG also gives OG a supported format for sources such as WebP and AVIF.
+      const buffer = await sharp(Buffer.from(await response.arrayBuffer())).png().toBuffer()
+      return {
+        src: `data:image/png;base64,${buffer.toString('base64')}`,
+        width: parsedReq.widths[index] || '200',
+        height: parsedReq.heights[index] || '200'
+      }
+    } catch (error) {
+      console.warn('Skipping unavailable card image:', url, error)
+      return null
+    }
+  }))
+
+  return images.filter((image): image is CardImage => image !== null)
+}
+
 export function getImageContentType(fileType: FileType) {
   return fileType === 'jpeg' ? 'image/jpeg' : 'image/png'
 }
 
-function buildCard(parsedReq: ParsedRequest) {
+function buildCard(parsedReq: ParsedRequest, images: CardImage[]) {
   const colors = themeColors[parsedReq.theme]
   const titleSize = getTitleSize(parsedReq.fontSize)
   const captionSize = Math.max(28, Math.round(titleSize * 0.35))
-  const imageSizes = parsedReq.images.map((_, index) => ({
-    width: parsedReq.widths[index] || '200',
-    height: parsedReq.heights[index] || '200'
-  }))
 
   return createElement(
     'div',
@@ -108,21 +134,21 @@ function buildCard(parsedReq: ParsedRequest) {
     createElement(
       'div',
       { style: getBodyStyle() },
-      parsedReq.images.length > 0
+      images.length > 0
         ? createElement(
             'div',
             { style: getImagesRowStyle() },
-            parsedReq.images.map((image, index) =>
+            images.map((image, index) =>
               createElement(
                 Fragment,
-                { key: `${image}-${index}` },
+                { key: `${image.src}-${index}` },
                 index > 0
                   ? createElement('div', { style: getPlusStyle(colors) }, '+')
                   : null,
                 createElement('img', {
-                  src: image,
+                  src: image.src,
                   alt: '',
-                  style: getImageStyle(imageSizes[index])
+                  style: getImageStyle(image)
                 })
               )
             )
